@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>唯唯气泡生成器</title>
+<style>
+  :root{
+    --bg:#f5f5f7; --panel:#fff; --line:#ececef; --line-2:#f4f4f6;
+    --ink:#1c1c1e; --ink-2:#6e6e73; --ink-3:#a5a5aa;
+    --radius:14px; --red:#ff3b30; --accent:#1c1c1e;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",Arial,sans-serif;
+    background:var(--bg);color:var(--ink);font-size:13px;
+    -webkit-font-smoothing:antialiased;overflow:hidden;
+  }
+  .app{display:grid;grid-template-columns:376px 1fr;height:100vh;overflow:hidden}
+
+  .activation-mask{
+    position:fixed; inset:0; z-index:9999;
+    background:rgba(248,248,250,.86);
+    backdrop-filter:blur(22px) saturate(160%);
+    -webkit-backdrop-filter:blur(22px) saturate(160%);
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .activation-mask.is-open{display:flex}
+  .activation-card{
+    background:#fff; border-radius:26px; padding:34px 30px 30px;
+    width:100%; max-width:400px; text-align:center;
+    box-shadow:0 30px 80px rgba(20,20,30,.16), 0 0 0 1px rgba(0,0,0,.04);
+    animation:cardIn .38s cubic-bezier(.2,.8,.3,1);
+  }
+  @keyframes cardIn{from{opacity:0;transform:scale(.94) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+  .act-logo{width:78px;height:78px;margin:0 auto 16px;border-radius:50%;overflow:hidden;background:#f2f2f5;box-shadow:0 10px 28px rgba(30,30,40,.12),0 0 0 1px rgba(0,0,0,.04)}
+  .act-logo img{width:100%;height:100%;object-fit:cover;display:block}
+  .activation-card h2{margin:0 0 14px;font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+  .act-notice{font-size:13px;line-height:1.75;color:var(--ink-2);background:#fafafc;border:1px solid var(--line-2);border-radius:12px;padding:14px 16px;margin-bottom:22px;text-align:left}
+  .act-notice b{color:var(--ink);font-weight:600}
+  .act-input{width:100%;height:44px;padding:0 16px;border:1.5px solid var(--line);border-radius:12px;background:#fafafa;font-family:inherit;font-size:14px;color:var(--ink);outline:none;transition:.2s;text-align:center}
+  .act-input::placeholder{color:var(--ink-3);font-size:13px}
+  .act-input:focus{background:#fff;border-color:#d5d5da;box-shadow:0 0 0 4px rgba(0,0,0,.03)}
+  .act-input.is-error{border-color:#ffb3ae;animation:shake .35s}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+  .act-error{display:none;font-size:12px;color:#ff3b30;margin-top:8px;text-align:left;padding-left:4px}
+  .act-error.is-show{display:block;animation:fadeIn .2s}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .act-btn{width:100%;height:44px;margin-top:18px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:.18s;letter-spacing:.02em}
+  .act-btn:hover{background:#000;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+  .act-btn:active{transform:scale(.98)}
+
+  .panel{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;z-index:10}
+  .panel-head{padding:20px 18px 14px;flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .panel-head h1{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+  .panel-head p{margin:5px 0 0;font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+  .reset-btn{flex:none;height:28px;padding:0 11px;border:1px solid var(--line);border-radius:8px;background:#fafafa;font-family:inherit;font-size:11.5px;color:var(--ink-2);cursor:pointer;transition:.18s;display:flex;align-items:center;gap:5px}
+  .reset-btn:hover{background:#f0f0f3;color:var(--ink)}
+  .reset-btn:active{transform:scale(.97)}
+  .reset-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+  .tabs{display:flex;gap:4px;padding:0 14px 12px;flex:none}
+  .tab{flex:1;height:34px;border:none;border-radius:9px;background:#f4f4f6;color:var(--ink-2);font-size:12.5px;font-weight:500;font-family:inherit;cursor:pointer;transition:.18s}
+  .tab:hover{background:#eeeef1}
+  .tab.is-active{background:var(--ink);color:#fff}
+
+  .panel-body{flex:1;overflow-y:auto;padding:0 14px 24px;display:flex;flex-direction:column;gap:10px}
+  .panel-body::-webkit-scrollbar{width:9px}
+  .panel-body::-webkit-scrollbar-thumb{background:#e3e3e7;border-radius:6px;border:3px solid #fff}
+  .panel-body::-webkit-scrollbar-track{background:transparent}
+
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:13px 13px 14px;background:#fff}
+  .card-head{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:11px;letter-spacing:.01em}
+  .card-head em{font-style:normal;font-weight:400;color:var(--ink-3);font-size:11px}
+
+  .ctrl{margin-bottom:13px}
+  .ctrl:last-child{margin-bottom:0}
+  .ctrl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;font-size:12px;color:var(--ink-2)}
+  .ctrl-head b{font-weight:500;color:var(--ink-3);font-variant-numeric:tabular-nums;font-size:11.5px}
+  .ctrl.inline{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink-2)}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;background:transparent;cursor:pointer;display:block;margin:0}
+  input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:#e6e6ea}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-5.5px;border-radius:50%;background:#fff;border:1px solid #dcdce1;box-shadow:0 1px 3px rgba(0,0,0,.14);transition:transform .15s}
+  input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
+  input[type=range]::-moz-range-track{height:3px;border-radius:2px;background:#e6e6ea}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:#fff;border:1px solid #dcdce1;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+
+  .txt{width:100%;height:34px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:#fafafa;font-family:inherit;font-size:12px;color:var(--ink);outline:none;transition:.18s}
+  .txt::placeholder{color:var(--ink-3)}
+  .txt:focus{background:#fff;border-color:#d5d5da;box-shadow:0 0 0 3px rgba(0,0,0,.03)}
+
+  .sel{height:30px;padding:0 26px 0 10px;border:1px solid var(--line);border-radius:8px;background:#fafafa url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a5a5aa' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 9px center;-webkit-appearance:none;appearance:none;font-family:inherit;font-size:12px;color:var(--ink);outline:none;cursor:pointer}
+
+  .switch{position:relative;display:inline-block;width:38px;height:22px;flex:none}
+  .switch input{opacity:0;width:0;height:0;position:absolute}
+  .switch i{position:absolute;inset:0;background:#e4e4e8;border-radius:11px;transition:background .2s}
+  .switch i::after{content:"";position:absolute;width:18px;height:18px;left:2px;top:2px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .2s}
+  .switch input:checked + i{background:#1c1c1e}
+  .switch input:checked + i::after{transform:translateX(16px)}
+
+  input[type=color]{-webkit-appearance:none;appearance:none;width:38px;height:24px;border:1px solid var(--line);border-radius:7px;padding:0;background:none;cursor:pointer;overflow:hidden}
+  input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
+  input[type=color]::-webkit-color-swatch{border:none;border-radius:5px}
+
+  .upload{display:flex;align-items:center;justify-content:center;height:32px;margin-top:8px;border:1px dashed #dcdce1;border-radius:9px;font-size:11.5px;color:var(--ink-2);cursor:pointer;transition:.18s}
+  .upload:hover{border-color:#c8c8ce;background:#fafafa}
+  .upload input{display:none}
+
+  .mini-btn{height:24px;padding:0 11px;border:1px solid var(--line);border-radius:7px;background:#fafafa;font-family:inherit;font-size:11px;color:var(--ink-2);cursor:pointer;transition:.18s}
+  .mini-btn:hover{background:#f0f0f3;color:var(--ink)}
+
+  .format-tabs{display:flex;gap:4px;margin-bottom:10px}
+  .format-tab{flex:1;height:30px;border:1px solid var(--line);border-radius:8px;background:#fafafa;color:var(--ink-2);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:.18s}
+  .format-tab:hover{background:#f0f0f3;color:var(--ink)}
+  .format-tab.is-active{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  .code{margin:0;padding:12px;background:#fafafa;border:1px solid var(--line-2);border-radius:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.65;color:#3a3a3c;white-space:pre-wrap;word-break:break-all;max-height:280px;overflow:auto}
+  .code::-webkit-scrollbar{width:7px;height:7px}
+  .code::-webkit-scrollbar-thumb{background:#e0e0e5;border-radius:4px}
+
+  .workspace{position:relative;overflow:hidden;background:radial-gradient(900px 600px at 70% 20%, #fff 0%, transparent 60%),linear-gradient(160deg,#f2f2f5 0%,#eaeaee 100%);display:flex;align-items:center;justify-content:center}
+  .slicer-card{background:#fff;border-radius:22px;padding:22px;box-shadow:0 24px 70px rgba(30,30,40,.10),0 0 0 1px rgba(0,0,0,.04);max-width:min(720px,88%);max-height:86%;display:flex;flex-direction:column;gap:14px}
+  .slicer-title{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:600;color:var(--ink)}
+  .slicer-title span{color:var(--ink-3);font-weight:400;font-size:11px}
+
+  .slicer{position:relative;display:inline-block;line-height:0;max-width:100%;user-select:none;touch-action:none;border-radius:10px;overflow:hidden;background:linear-gradient(45deg,#f6f6f8 25%,transparent 25%,transparent 75%,#f6f6f8 75%),linear-gradient(45deg,#f6f6f8 25%,#fafafb 25%,#fafafb 75%,#f6f6f8 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+  .slicer img{display:block;max-width:100%;max-height:58vh;border-radius:10px;pointer-events:none;-webkit-user-drag:none}
+  .slicer.no-img img{display:none}
+  .slicer.no-img::after{content:"粘贴图片链接 / 上传本地图片";display:flex;align-items:center;justify-content:center;width:340px;height:220px;font-size:12.5px;color:#b6b6bc;line-height:1}
+
+  .gline{position:absolute;background:transparent;z-index:3;display:none}
+  .slicer.has-img .gline{display:block}
+  .gline::before{content:"";position:absolute;background:var(--red);opacity:.85;border-radius:2px;transition:opacity .15s}
+  .gline.v{top:0;bottom:0;width:20px;margin-left:-10px;cursor:ew-resize}
+  .gline.v::before{top:0;bottom:0;left:9px;width:2px}
+  .gline.h{left:0;right:0;height:20px;margin-top:-10px;cursor:ns-resize}
+  .gline.h::before{left:0;right:0;top:9px;height:2px}
+  .gline::after{content:"";position:absolute;width:16px;height:16px;background:#fff;border:2px solid var(--red);border-radius:50%;box-shadow:0 2px 6px rgba(255,59,48,.28);left:50%;top:50%;transform:translate(-50%,-50%);transition:transform .15s}
+  .gline:hover::before{opacity:1}
+  .gline.dragging::after{transform:translate(-50%,-50%) scale(1.22)}
+  .gline.dragging::before{opacity:1}
+
+  .fab{position:absolute;left:0;top:0;width:58px;height:58px;border-radius:50%;border:none;background:#fff;padding:0;overflow:hidden;cursor:grab;box-shadow:0 10px 28px rgba(0,0,0,.22),0 2px 6px rgba(0,0,0,.14),0 0 0 2px #fff;z-index:60;touch-action:none;user-select:none;transition:transform .18s, box-shadow .18s}
+  .fab:active{cursor:grabbing}
+  .fab:hover{box-shadow:0 14px 34px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.14),0 0 0 2px #fff}
+  .fab.is-dragging{transform:scale(1.06);cursor:grabbing}
+  .fab.is-open{box-shadow:0 10px 28px rgba(255,59,48,.34),0 2px 6px rgba(0,0,0,.14),0 0 0 2.5px #ff3b30}
+  .fab img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;pointer-events:none;-webkit-user-drag:none}
+
+  .preview{position:absolute;left:0;top:0;width:320px;max-height:min(560px,calc(100% - 32px));background:#fff;border-radius:20px;box-shadow:0 26px 70px rgba(20,20,30,.20),0 0 0 1px rgba(0,0,0,.05);display:flex;flex-direction:column;overflow:hidden;z-index:55;opacity:0;visibility:hidden;transform:scale(.94) translateY(6px);transform-origin:center;transition:opacity .2s cubic-bezier(.2,.8,.3,1),transform .2s cubic-bezier(.2,.8,.3,1),visibility .2s}
+  .preview.is-open{opacity:1;visibility:visible;transform:scale(1) translateY(0)}
+  .preview-head{flex:none;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #f1f1f3;background:rgba(255,255,255,.92);backdrop-filter:blur(18px)}
+  .preview-head em{font-style:normal;font-size:10.5px;font-weight:400;color:var(--ink-3);letter-spacing:.02em;padding-right:6px}
+  .preview-head-left{display:flex;align-items:center;gap:6px}
+  .bg-upload-btn{height:26px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:#fafafa;font-size:11px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:4px;transition:.18s}
+  .bg-upload-btn:hover{background:#f0f0f3;color:var(--ink)}
+  .bg-upload-btn input{display:none}
+  .bg-upload-btn svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+  .preview-body{flex:1;overflow-y:auto;padding:18px 13px 22px;background:#f4f4f6;background-size:cover;background-position:center;background-repeat:no-repeat;transition:background-image .3s}
+  .preview-body::-webkit-scrollbar{width:0}
+
+  .preview .cv-row{display:flex;margin-bottom:14px;align-items:flex-start}
+  .preview .cv-row:last-child{margin-bottom:0}
+  .preview .cv-row.role{justify-content:flex-start}
+  .preview .cv-row.user{justify-content:flex-end}
+  .preview .cv-bubble{box-sizing:border-box;word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap;display:inline-block;border-radius:15px;padding:9px 13px;font-size:15px;line-height:1.5;width:fit-content;position:relative;background:#ffffff;color:#1c1c1e;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+  .preview .cv-row.user .cv-bubble{background:#1c1c1e;color:#fff;box-shadow:none}
+  .preview .cv-bubble-text{display:inline-block;position:relative;will-change:left,top}
+  .preview .preview-label{font-size:10.5px;color:#b0b0b6;margin:0 0 8px 2px;letter-spacing:.04em;text-shadow:0 1px 2px rgba(255,255,255,.7)}
+  .preview .preview-sep{height:14px}
+
+  @media (max-width:980px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:100vh;overflow:hidden}
+    .panel{border-right:none;border-bottom:1px solid var(--line);max-height:52vh}
+    .slicer-card{max-width:92%;padding:16px}
+    .slicer img{max-height:34vh}
+  }
+</style>
+</head>
+<body>
+
+<div class="activation-mask" id="actMask">
+  <div class="activation-card">
+    <div class="act-logo">
+      <img src="https://imgbed.heliar.top/i/-4m4qUeneMLhfVeV_无标题893_20260916102241.png" alt="logo" />
+    </div>
+    <h2>唯唯气泡生成器</h2>
+    <div class="act-notice">
+      <b>欢迎使用唯唯气泡生成器</b><br>
+      通过此生成器发布需要标注生成器哦！
+    </div>
+    <input class="act-input" type="text" id="actInput" placeholder="请输入激活码" autocomplete="off" spellcheck="false" />
+    <div class="act-error" id="actError">激活码错误</div>
+    <button class="act-btn" id="actBtn">确认激活</button>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="panel">
+    <div class="panel-head">
+      <div>
+        <h1>唯唯气泡生成器</h1>
+        <p>九宫格自由拖拽 · 文字独立偏移</p>
+      </div>
+      <button class="reset-btn" id="resetBtn" title="重置当前气泡的全部设置">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        重置
+      </button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab is-active" data-tab="role">对面气泡</button>
+      <button class="tab" data-tab="user">我的气泡</button>
+    </div>
+
+    <div class="panel-body" id="panelBody">
+
+      <section class="card">
+        <div class="card-head">气泡图片</div>
+        <div class="ctrl" data-key="img">
+          <input class="txt" type="text" placeholder="粘贴图片链接 https://…" spellcheck="false" />
+        </div>
+        <label class="upload">
+          <input type="file" accept="image/*" />
+          <span>选择本地图片</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <div class="card-head">整体缩放 <em>只缩放图片边框</em></div>
+        <div class="ctrl" data-key="zoomScale">
+          <div class="ctrl-head"><span>缩放比例</span><b class="val">1.00</b></div>
+          <input type="number" class="txt" placeholder="1.00" step="0.05" min="0.1" max="3" style="text-align:center;" />
+        </div>
+        <p style="margin:8px 0 0;font-size:10.5px;color:#a5a5aa;line-height:1.5">
+          只影响图片边框，不改变文字大小，也不影响气泡整体比例。
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">九宫格切割 <em>拖动右侧红线</em></div>
+        <div class="ctrl" data-key="slice.t">
+          <div class="ctrl-head"><span>上裁剪</span><b class="val">20%</b></div>
+          <input type="range" min="0" max="100" step="0.5" />
+        </div>
+        <div class="ctrl" data-key="slice.r">
+          <div class="ctrl-head"><span>右裁剪</span><b class="val">15%</b></div>
+          <input type="range" min="0" max="100" step="0.5" />
+        </div>
+        <div class="ctrl" data-key="slice.b">
+          <div class="ctrl-head"><span>下裁剪</span><b class="val">20%</b></div>
+          <input type="range" min="0" max="100" step="0.5" />
+        </div>
+        <div class="ctrl" data-key="slice.l">
+          <div class="ctrl-head"><span>左裁剪</span><b class="val">15%</b></div>
+          <input type="range" min="0" max="100" step="0.5" />
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">气泡宽度 <em>文字自动包裹</em></div>
+        <div class="ctrl" data-key="maxWidth">
+          <div class="ctrl-head"><span>最大宽度（超出才换行）</span><b class="val">220px</b></div>
+          <input type="range" min="60" max="500" step="2" />
+        </div>
+        <p style="margin:8px 0 0;font-size:10.5px;color:#a5a5aa;line-height:1.5">
+          文字少气泡就窄，文字多到最大宽度才往下换行。
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">外观</div>
+        <div class="ctrl inline" data-key="repeat">
+          <span>平铺方式</span>
+          <select class="sel">
+            <option value="stretch">stretch 拉伸</option>
+            <option value="repeat">repeat 平铺</option>
+            <option value="round">round 圆铺</option>
+          </select>
+        </div>
+        <div class="ctrl inline" data-key="fill" style="margin-top:13px">
+          <span>填充中心区域（fill）</span>
+          <label class="switch"><input type="checkbox" /><i></i></label>
+        </div>
+        <div class="ctrl inline" data-key="mirror" style="margin-top:13px">
+          <span>镜像翻转（左右对调）</span>
+          <label class="switch"><input type="checkbox" /><i></i></label>
+        </div>
+        <div class="ctrl inline" data-key="color" style="margin-top:13px">
+          <span>文字颜色</span>
+          <input type="color" />
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">文字</div>
+        <div class="ctrl" data-key="fontSize">
+          <div class="ctrl-head"><span>字号（仅文字）</span><b class="val">14px</b></div>
+          <input type="range" min="10" max="32" step="1" />
+        </div>
+        <div class="ctrl" data-key="lineHeight">
+          <div class="ctrl-head"><span>行高</span><b class="val">1.5</b></div>
+          <input type="range" min="1" max="2.2" step="0.05" />
+        </div>
+        <div class="ctrl" data-key="padX">
+          <div class="ctrl-head"><span>左右内边距</span><b class="val">0px</b></div>
+          <input type="range" min="0" max="30" step="1" />
+        </div>
+        <div class="ctrl" data-key="padY">
+          <div class="ctrl-head"><span>上下内边距</span><b class="val">0px</b></div>
+          <input type="range" min="0" max="30" step="1" />
+        </div>
+
+        <div class="ctrl" data-key="textX" style="margin-top:14px;padding-top:13px;border-top:1px dashed #ececef">
+          <div class="ctrl-head"><span>文字左右偏移</span><b class="val">0px</b></div>
+          <input type="range" min="-40" max="40" step="1" />
+        </div>
+        <div class="ctrl" data-key="textY">
+          <div class="ctrl-head"><span>文字上下偏移</span><b class="val">0px</b></div>
+          <input type="range" min="-40" max="40" step="1" />
+        </div>
+        <p style="margin:8px 0 0;font-size:10.5px;color:#a5a5aa;line-height:1.5">
+          <b>重要：</b>生成的偏移代码要求文字被包裹在 <code>&lt;span class="cv-bubble-text"&gt;</code> 或 <code>&lt;span&gt;</code> 中。
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          生成代码
+          <button class="mini-btn" id="copyBtn">复制</button>
+        </div>
+        <div class="format-tabs">
+          <button class="format-tab is-active" data-format="mori">Mori 格式</button>
+          <button class="format-tab" data-format="nuoji">糯叽机格式</button>
+          <button class="format-tab" data-format="link">LINK 格式</button>
+        </div>
+        <pre class="code" id="codeOut"></pre>
+      </section>
+
+    </div>
+  </aside>
+
+  <main class="workspace" id="workspace">
+
+    <div class="slicer-card">
+      <div class="slicer-title">
+        <span id="slicerLabel">对面气泡 · 九宫格编辑</span>
+        <span>拖动红线调整</span>
+      </div>
+      <div class="slicer no-img" id="slicer">
+        <img id="sliceImg" alt="" />
+        <div class="gline v" data-side="l"></div>
+        <div class="gline v" data-side="r"></div>
+        <div class="gline h" data-side="t"></div>
+        <div class="gline h" data-side="b"></div>
+      </div>
+    </div>
+
+    <button class="fab" id="fab" title="拖动移动位置，点击预览气泡">
+      <img src="https://imgbed.heliar.top/i/-4m4qUeneMLhfVeV_无标题893_20260916102241.png" alt="唯唯" />
+    </button>
+
+    <div class="preview" id="preview">
+      <div class="preview-head">
+        <div class="preview-head-left">
+          <label class="bg-upload-btn" title="上传预览背景图">
+            <input type="file" accept="image/*" id="bgUpload" />
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            背景
+          </label>
+        </div>
+        <em id="previewMode">对面气泡</em>
+      </div>
+      <div class="preview-body" id="previewBody">
+        <div class="preview-label">短句 · 对面</div>
+        <div class="cv-row role">
+          <div class="cv-bubble cv-bubble-role"><span class="cv-bubble-text">嗯，我在的。</span></div>
+        </div>
+
+        <div class="preview-label">长句 · 对面</div>
+        <div class="cv-row role">
+          <div class="cv-bubble cv-bubble-role"><span class="cv-bubble-text">今天路过那家店，忽然想起你以前说过喜欢靠窗的位置。我坐了一会儿，风挺大的，把桌上的纸巾吹到了地上，捡起来的时候发现背面写着一行很旧的字，不知道是谁留下的。</span></div>
+        </div>
+
+        <div class="preview-sep"></div>
+
+        <div class="preview-label">短句 · 我</div>
+        <div class="cv-row user">
+          <div class="cv-bubble cv-bubble-user"><span class="cv-bubble-text">好呀，那明天见。</span></div>
+        </div>
+
+        <div class="preview-label">长句 · 我</div>
+        <div class="cv-row user">
+          <div class="cv-bubble cv-bubble-user"><span class="cv-bubble-text">其实我也记得那家店。有一年冬天特别冷，我们缩在角落里，你把围巾分了一半给我，那时候我就想，要是能一直这样就好了。后来很多事情都变了，但那个下午的颜色我一直没忘。</span></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<style id="live"></style>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ══════════════════════════════════════════════════════
+     固定密码激活（weiwei520）
+     ══════════════════════════════════════════════════════ */
+  var ACT_KEY = 'weiwei_activated_final';
+  var ACT_CODE = 'weiwei520';   /* ← 激活密码，可改成你想要的内容 */
+
+  function isActivated(){
+    try { return localStorage.getItem(ACT_KEY) === '1'; } catch(e){ return false; }
+  }
+  function setActivated(){
+    try { localStorage.setItem(ACT_KEY, '1'); } catch(e){}
+  }
+
+  var actMask  = document.getElementById('actMask');
+  var actInput = document.getElementById('actInput');
+  var actError = document.getElementById('actError');
+  var actBtn   = document.getElementById('actBtn');
+
+  if (!isActivated()){
+    actMask.classList.add('is-open');
+    setTimeout(function(){ actInput.focus(); }, 280);
+  }
+
+  function showActError(msg){
+    actError.textContent = msg;
+    actError.classList.add('is-show');
+    actInput.classList.add('is-error');
+    actInput.select();
+    setTimeout(function(){ actInput.classList.remove('is-error'); }, 400);
+  }
+
+  function tryActivate(){
+    var v = (actInput.value || '').trim();
+    if (v === ACT_CODE){
+      setActivated();
+      actMask.classList.remove('is-open');
+      actError.classList.remove('is-show');
+      actInput.classList.remove('is-error');
+    } else {
+      showActError('激活码错误');
+    }
+  }
+
+  actBtn.addEventListener('click', tryActivate);
+  actInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') tryActivate();
+  });
+  actInput.addEventListener('input', function(){
+    actError.classList.remove('is-show');
+  });
+
+  /* ══════════════════════════════════════════════════════
+     预览背景图上传
+     ══════════════════════════════════════════════════════ */
+  var bgUpload = document.getElementById('bgUpload');
+  var previewBody = document.getElementById('previewBody');
+  bgUpload.addEventListener('change', function(){
+    var f = bgUpload.files && bgUpload.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      previewBody.style.backgroundImage = 'url("' + reader.result + '")';
+    };
+    reader.readAsDataURL(f);
+  });
+
+  /* ══════════════════════════════════════════════════════
+     主逻辑
+     ══════════════════════════════════════════════════════ */
+  const DEFAULTS = {
+    img: '',
+    zoomScale: 1.00,
+    slice: { t: 20, r: 15, b: 20, l: 15 },
+    repeat: 'stretch',
+    fill: false,
+    mirror: false,
+    color: '#1c1c1e',
+    fontSize: 14,
+    lineHeight: 1.5,
+    padX: 0,
+    padY: 0,
+    maxWidth: 220,
+    textX: 0,
+    textY: 0
+  };
+
+  const state = {
+    tab: 'role',
+    format: 'mori',
+    role: JSON.parse(JSON.stringify(DEFAULTS)),
+    user: JSON.parse(JSON.stringify(DEFAULTS)),
+    imgNatural: { w: 0, h: 0 },
+    baseWidth: 160
+  };
+
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
+
+  const panelBody    = $('#panelBody');
+  const codeOut      = $('#codeOut');
+  const liveStyle    = $('#live');
+  const workspace    = $('#workspace');
+  const slicer       = $('#slicer');
+  const sliceImg     = $('#sliceImg');
+  const slicerLabel  = $('#slicerLabel');
+  const fab          = $('#fab');
+  const preview      = $('#preview');
+  const previewMode  = $('#previewMode');
+  const resetBtn     = $('#resetBtn');
+
+  const get = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
+  function set(o, p, v){
+    const ks = p.split('.');
+    const last = ks.pop();
+    let cur = o;
+    for (const k of ks) cur = cur[k];
+    cur[last] = v;
+  }
+
+  function calcBorderPx(c){
+    const nw = state.imgNatural.w || 200;
+    const nh = state.imgNatural.h || 200;
+    const maxSide = Math.max(nw, nh);
+    const scaleToBase = state.baseWidth / maxSide;
+    const zoom = Number(c.zoomScale) || 1;
+    return {
+      t: Math.round(nh * scaleToBase * (c.slice.t / 100) * zoom),
+      r: Math.round(nw * scaleToBase * (c.slice.r / 100) * zoom),
+      b: Math.round(nh * scaleToBase * (c.slice.b / 100) * zoom),
+      l: Math.round(nw * scaleToBase * (c.slice.l / 100) * zoom)
+    };
+  }
+
+  /* ====== Mori 格式 ====== */
+  function bubbleBlockMori(which){
+    const c = state[which];
+    const isRole = which === 'role';
+    const cls = isRole ? '.cv-bubble-role' : '.cv-bubble-user';
+    const title = isRole ? '对面气泡（角色）' : '我的气泡（User）';
+
+    const bw = calcBorderPx(c);
+    const bwStr = bw.t + 'px ' + bw.r + 'px ' + bw.b + 'px ' + bw.l + 'px';
+
+    const sizeProps = ['width: fit-content;','max-width: ' + c.maxWidth + 'px;'];
+    const textProps = [
+      'font-size: ' + c.fontSize + 'px;',
+      'line-height: ' + c.lineHeight + ';',
+      'color: ' + c.color + ';',
+      'padding: ' + c.padY + 'px ' + c.padX + 'px;'
+    ];
+
+    const textOffsetBlock = [
+      '',
+      '/* 文字层：独立偏移，气泡完全不动 */',
+      cls + ' > .cv-bubble-text,',
+      cls + ' > span {',
+      '  display: inline-block !important;',
+      '  position: relative !important;',
+      '  left: ' + c.textX + 'px !important;',
+      '  top: ' + c.textY + 'px !important;',
+      '  will-change: left, top;',
+      '}',
+      ''
+    ].join('\n');
+
+    if (!c.img || !c.img.trim()){
+      return [
+        '/* ── ' + title + ' ── */',
+        '/* 还没有填写图片链接，以下为尺寸和文字设置 */',
+        cls + ' {',
+        '  box-sizing: border-box;',
+        '  ' + sizeProps.join('\n  '),
+        '  ' + textProps.join('\n  '),
+        '}',
+        textOffsetBlock
+      ].join('\n');
+    }
+
+    const slice = c.slice.t + '% ' + c.slice.r + '% ' + c.slice.b + '% ' + c.slice.l + '%';
+    const fillStr = c.fill ? ' fill' : '';
+    const bi = 'border-image: url("' + c.img + '") ' + slice + fillStr + ' / ' + bwStr + ' ' + c.repeat + ';';
+
+    if (c.mirror){
+      const inset = '-' + bw.t + 'px -' + bw.r + 'px -' + bw.b + 'px -' + bw.l + 'px';
+      return [
+        '/* ── ' + title + ' ── */',
+        cls + ' {',
+        '  position: relative;',
+        '  z-index: 0;',
+        '  box-sizing: border-box;',
+        '  border-style: solid;',
+        '  border-width: ' + bwStr + ';',
+        '  border-color: transparent;',
+        '  background: transparent;',
+        '  border-radius: 0;',
+        '  word-break: break-word;',
+        '  ' + sizeProps.join('\n  '),
+        '  ' + textProps.join('\n  '),
+        '}',
+        '',
+        cls + '::before {',
+        '  content: "";',
+        '  position: absolute;',
+        '  inset: ' + inset + ';',
+        '  box-sizing: border-box;',
+        '  border-style: solid;',
+        '  border-width: ' + bwStr + ';',
+        '  ' + bi,
+        '  transform: scaleX(-1);',
+        '  pointer-events: none;',
+        '  z-index: -1;',
+        '}',
+        textOffsetBlock
+      ].join('\n');
+    }
+
+    return [
+      '/* ── ' + title + ' ── */',
+      cls + ' {',
+      '  box-sizing: border-box;',
+      '  border-style: solid;',
+      '  border-width: ' + bwStr + ';',
+      '  ' + bi,
+      '  background: transparent;',
+      '  border-radius: 0;',
+      '  word-break: break-word;',
+      '  ' + sizeProps.join('\n  '),
+      '  ' + textProps.join('\n  '),
+      '}',
+      textOffsetBlock
+    ].join('\n');
+  }
+
+  /* ====== 糯叽机格式 ====== */
+  function bubbleBlockNuoji(which){
+    const c = state[which];
+    const isRole = which === 'role';
+    const cls = isRole ? '.bubble-them-custom' : '.bubble-me-custom';
+    const title = isRole ? '对面气泡（them）' : '我的气泡（me）';
+
+    const bw = calcBorderPx(c);
+    const bwStr = bw.t + 'px ' + bw.r + 'px ' + bw.b + 'px ' + bw.l + 'px';
+
+    const textOffsetBlock = [
+      '',
+      '/* 文字层：独立偏移，气泡完全不动 */',
+      cls + ' > span,',
+      cls + ' > .cv-bubble-text {',
+      '  display: inline-block !important;',
+      '  position: relative !important;',
+      '  left: ' + c.textX + 'px !important;',
+      '  top: ' + c.textY + 'px !important;',
+      '  will-change: left, top;',
+      '}',
+      ''
+    ].join('\n');
+
+    const baseProps = [
+      'box-sizing: border-box !important;',
+      'width: fit-content !important;',
+      'max-width: ' + c.maxWidth + 'px !important;',
+      'word-break: break-word !important;',
+      'overflow-wrap: anywhere !important;',
+      'white-space: pre-wrap !important;',
+      'font-size: ' + c.fontSize + 'px !important;',
+      'line-height: ' + c.lineHeight + ' !important;',
+      'color: ' + c.color + ' !important;',
+      'padding: ' + c.padY + 'px ' + c.padX + 'px !important;'
+    ];
+
+    if (!c.img || !c.img.trim()){
+      return [
+        '/* ── ' + title + ' ── */',
+        cls + ' {',
+        '  ' + baseProps.join('\n  '),
+        '}',
+        textOffsetBlock
+      ].join('\n');
+    }
+
+    const slice = c.slice.t + '% ' + c.slice.r + '% ' + c.slice.b + '% ' + c.slice.l + '%';
+    const fillStr = c.fill ? ' fill' : '';
+    const bi = 'border-image: url("' + c.img + '") ' + slice + fillStr + ' / ' + bwStr + ' ' + c.repeat + ' !important;';
+
+    const imageProps = [
+      'box-sizing: border-box !important;',
+      'border-style: solid !important;',
+      'border-width: ' + bwStr + ' !important;',
+      bi,
+      'background: transparent !important;',
+      'background-color: transparent !important;',
+      'border-radius: 0 !important;',
+      'box-shadow: none !important;',
+      'width: fit-content !important;',
+      'max-width: ' + c.maxWidth + 'px !important;',
+      'word-break: break-word !important;',
+      'overflow-wrap: anywhere !important;',
+      'white-space: pre-wrap !important;',
+      'font-size: ' + c.fontSize + 'px !important;',
+      'line-height: ' + c.lineHeight + ' !important;',
+      'color: ' + c.color + ' !important;',
+      'padding: ' + c.padY + 'px ' + c.padX + 'px !important;'
+    ];
+
+    if (c.mirror){
+      const inset = '-' + bw.t + 'px -' + bw.r + 'px -' + bw.b + 'px -' + bw.l + 'px';
+      return [
+        '/* ── ' + title + ' ── */',
+        cls + ' {',
+        '  position: relative !important;',
+        '  z-index: 0 !important;',
+        '  border-style: solid !important;',
+        '  border-width: ' + bwStr + ' !important;',
+        '  border-color: transparent !important;',
+        '  background: transparent !important;',
+        '  border-radius: 0 !important;',
+        '  box-shadow: none !important;',
+        '  width: fit-content !important;',
+        '  max-width: ' + c.maxWidth + 'px !important;',
+        '  word-break: break-word !important;',
+        '  font-size: ' + c.fontSize + 'px !important;',
+        '  line-height: ' + c.lineHeight + ' !important;',
+        '  color: ' + c.color + ' !important;',
+        '  padding: ' + c.padY + 'px ' + c.padX + 'px !important;',
+        '}',
+        '',
+        cls + '::before {',
+        '  content: "" !important;',
+        '  position: absolute !important;',
+        '  inset: ' + inset + ' !important;',
+        '  box-sizing: border-box !important;',
+        '  border-style: solid !important;',
+        '  border-width: ' + bwStr + ' !important;',
+        '  ' + bi,
+        '  transform: scaleX(-1) !important;',
+        '  pointer-events: none !important;',
+        '  z-index: -1 !important;',
+        '}',
+        textOffsetBlock
+      ].join('\n');
+    }
+
+    return [
+      '/* ── ' + title + ' ── */',
+      cls + ' {',
+      '  ' + imageProps.join('\n  '),
+      '}',
+      textOffsetBlock
+    ].join('\n');
+  }
+
+  /* ====== LINK 格式 ====== */
+  function bubbleBlockLink(which){
+    const c = state[which];
+    const isRole = which === 'role';
+    const cls = isRole ? '.chat-room .bubble' : '.chat-room .message-row.user .bubble';
+    const title = isRole ? '对面气泡' : '我的气泡（user）';
+
+    const bw = calcBorderPx(c);
+    const bwStr = bw.t + 'px ' + bw.r + 'px ' + bw.b + 'px ' + bw.l + 'px';
+
+    const textOffsetBlock = [
+      '',
+      '/* 文字层：独立偏移，气泡完全不动 */',
+      cls + ' > span,',
+      cls + ' > .message-html-content,',
+      cls + ' > .cv-bubble-text {',
+      '  display: inline-block !important;',
+      '  position: relative !important;',
+      '  left: ' + c.textX + 'px !important;',
+      '  top: ' + c.textY + 'px !important;',
+      '  will-change: left, top;',
+      '}',
+      ''
+    ].join('\n');
+
+    const baseProps = [
+      'box-sizing: border-box !important;',
+      'width: fit-content !important;',
+      'max-width: ' + c.maxWidth + 'px !important;',
+      'word-break: break-word !important;',
+      'overflow-wrap: anywhere !important;',
+      'white-space: pre-wrap !important;',
+      'font-size: ' + c.fontSize + 'px !important;',
+      'line-height: ' + c.lineHeight + ' !important;',
+      'color: ' + c.color + ' !important;',
+      'padding: ' + c.padY + 'px ' + c.padX + 'px !important;'
+    ];
+
+    if (!c.img || !c.img.trim()){
+      return [
+        '/* ── ' + title + ' ── */',
+        cls + ' {',
+        '  ' + baseProps.join('\n  '),
+        '}',
+        textOffsetBlock
+      ].join('\n');
+    }
+
+    const slice = c.slice.t + '% ' + c.slice.r + '% ' + c.slice.b + '% ' + c.slice.l + '%';
+    const fillStr = c.fill ? ' fill' : '';
+    const bi = 'border-image: url("' + c.img + '") ' + slice + fillStr + ' / ' + bwStr + ' ' + c.repeat + ' !important;';
+
+    const imageProps = [
+      'box-sizing: border-box !important;',
+      'border-style: solid !important;',
+      'border-width: ' + bwStr + ' !important;',
+      bi,
+      'background: transparent !important;',
+      'background-color: transparent !important;',
+      'border-radius: 0 !important;',
+      'box-shadow: none !important;',
+      'width: fit-content !important;',
+      'max-width: ' + c.maxWidth + 'px !important;',
+      'word-break: break-word !important;',
+      'overflow-wrap: anywhere !important;',
+      'white-space: pre-wrap !important;',
+      'font-size: ' + c.fontSize + 'px !important;',
+      'line-height: ' + c.lineHeight + ' !important;',
+      'color: ' + c.color + ' !important;',
+      'padding: ' + c.padY + 'px ' + c.padX + 'px !important;'
+    ];
+
+    if (c.mirror){
+      const inset = '-' + bw.t + 'px -' + bw.r + 'px -' + bw.b + 'px -' + bw.l + 'px';
+      return [
+        '/* ── ' + title + ' ── */',
+        cls + ' {',
+        '  position: relative !important;',
+        '  z-index: 0 !important;',
+        '  border-style: solid !important;',
+        '  border-width: ' + bwStr + ' !important;',
+        '  border-color: transparent !important;',
+        '  background: transparent !important;',
+        '  border-radius: 0 !important;',
+        '  box-shadow: none !important;',
+        '  width: fit-content !important;',
+        '  max-width: ' + c.maxWidth + 'px !important;',
+        '  word-break: break-word !important;',
+        '  font-size: ' + c.fontSize + 'px !important;',
+        '  line-height: ' + c.lineHeight + ' !important;',
+        '  color: ' + c.color + ' !important;',
+        '  padding: ' + c.padY + 'px ' + c.padX + 'px !important;',
+        '}',
+        '',
+        cls + '::before {',
+        '  content: "" !important;',
+        '  position: absolute !important;',
+        '  inset: ' + inset + ' !important;',
+        '  box-sizing: border-box !important;',
+        '  border-style: solid !important;',
+        '  border-width: ' + bwStr + ' !important;',
+        '  ' + bi,
+        '  transform: scaleX(-1) !important;',
+        '  pointer-events: none !important;',
+        '  z-index: -1 !important;',
+        '}',
+        textOffsetBlock
+      ].join('\n');
+    }
+
+    return [
+      '/* ── ' + title + ' ── */',
+      cls + ' {',
+      '  ' + imageProps.join('\n  '),
+      '}',
+      textOffsetBlock
+    ].join('\n');
+  }
+
+  function buildCardOverrideNuoji(){
+    var cardSelectors = [
+      '.msg-transfer-card', '.msg-redpacket-card', '.msg-loc-card',
+      '.msg-videocall-card', '.msg-shopask-card', '.msg-gift-card',
+      '.gift-ig-container', '.msg-image-card', '.msg-image-wrapper',
+      '.msg-theater-card', '.msg-offline-invite-card', '.msg-couples-invite-card',
+      '.msg-couples-response-card', '.msg-werewolf-card', '.msg-mahjong-card',
+      '.msg-test-invite-card', '.msg-test-result-card', '.msg-forum-share-card',
+      '.msg-sim-card', '.msg-history-card', '.msg-game-result-card',
+      '.msg-narration-custom', '.bond-card-bubble'
+    ];
+    var lines = [];
+    lines.push('/* ===== 卡片消息：不显示图片气泡，直接显示卡片本身 ===== */');
+    lines.push('');
+    var pairs = [];
+    cardSelectors.forEach(function(sel){
+      pairs.push('.bubble-them-custom:has(' + sel + ')');
+      pairs.push('.bubble-me-custom:has(' + sel + ')');
+    });
+    lines.push(pairs.join(',\n') + ' {');
+    lines.push('  background: transparent !important;');
+    lines.push('  background-color: transparent !important;');
+    lines.push('  border: none !important;');
+    lines.push('  border-width: 0 !important;');
+    lines.push('  border-image: none !important;');
+    lines.push('  border-radius: 0 !important;');
+    lines.push('  box-shadow: none !important;');
+    lines.push('  padding: 0 !important;');
+    lines.push('  max-width: none !important;');
+    lines.push('  width: auto !important;');
+    lines.push('  color: inherit !important;');
+    lines.push('  font-size: inherit !important;');
+    lines.push('  line-height: inherit !important;');
+    lines.push('  white-space: normal !important;');
+    lines.push('}');
+    lines.push('');
+    lines.push(cardSelectors.map(function(sel){ return sel + ' { margin: 0 !important; }'; }).join('\n'));
+    return lines.join('\n');
+  }
+
+  function buildCardOverrideLink(){
+    var cardSelectors = [
+      '.bubble.call', '.bubble.image', '.bubble.voice', '.bubble.gobang',
+      '.bubble.commerce', '.bubble.shopShare', '.bubble.linkPreview',
+      '.bubble.theaterLink', '.bubble.musicListenInvite', '.bubble.offlineInvitation',
+      '.bubble.mcpResult', '.bubble.forumThread', '.bubble.sticker',
+      '.bubble.narration', '.bubble.mcpOperation'
+    ];
+    var lines = [];
+    lines.push('/* ===== 卡片消息：不显示图片气泡，直接显示卡片本身 ===== */');
+    lines.push('');
+    var prefixed = cardSelectors.map(function(sel){ return '.chat-room ' + sel; });
+    lines.push(prefixed.join(',\n') + ' {');
+    lines.push('  background: transparent !important;');
+    lines.push('  background-color: transparent !important;');
+    lines.push('  border: none !important;');
+    lines.push('  border-width: 0 !important;');
+    lines.push('  border-image: none !important;');
+    lines.push('  border-radius: 0 !important;');
+    lines.push('  box-shadow: none !important;');
+    lines.push('  padding: 0 !important;');
+    lines.push('  max-width: none !important;');
+    lines.push('  width: auto !important;');
+    lines.push('  color: inherit !important;');
+    lines.push('  font-size: inherit !important;');
+    lines.push('  line-height: inherit !important;');
+    lines.push('  white-space: normal !important;');
+    lines.push('}');
+    lines.push('');
+    lines.push(prefixed.map(function(sel){ return sel + ' { margin: 0 !important; }'; }).join('\n'));
+    return lines.join('\n');
+  }
+
+  function buildAll(){
+    if (state.format === 'nuoji'){
+      return '/* ========== 唯唯气泡生成器 · 糯叽机格式 ========== */\n'
+           + '/* 粘贴位置：糯叽机 → 聊天界面美化 → 自定义 CSS */\n\n'
+           + bubbleBlockNuoji('role') + '\n' + bubbleBlockNuoji('user') + '\n\n'
+           + buildCardOverrideNuoji();
+    }
+    if (state.format === 'link'){
+      return '/* ========== 唯唯气泡生成器 · LINK 格式 ========== */\n'
+           + '/* 粘贴位置：LINK → 聊天界面美化 → 自定义 CSS */\n\n'
+           + bubbleBlockLink('role') + '\n' + bubbleBlockLink('user') + '\n\n'
+           + buildCardOverrideLink();
+    }
+    return '/* ========== 唯唯气泡生成器 · Mori 格式 ========== */\n'
+         + '/* 粘贴位置：Mori → 聊天 → 右上角更多 → 聊天显示 → 气泡 CSS */\n\n'
+         + bubbleBlockMori('role') + '\n' + bubbleBlockMori('user');
+  }
+
+  function applyInlineStyles(){
+    ['role', 'user'].forEach(function(which){
+      const c = state[which];
+      const sel = which === 'role' ? '#preview .cv-bubble-role' : '#preview .cv-bubble-user';
+      document.querySelectorAll(sel).forEach(function(el){
+        el.style.background = '';
+        el.style.backgroundColor = '';
+        el.style.boxShadow = '';
+        el.style.fontSize     = c.fontSize + 'px';
+        el.style.lineHeight   = c.lineHeight;
+        el.style.padding      = c.padY + 'px ' + c.padX + 'px';
+        el.style.width        = 'fit-content';
+        el.style.maxWidth     = c.maxWidth + 'px';
+        el.style.minWidth     = '0';
+        el.style.display      = 'inline-block';
+        el.style.boxSizing    = 'border-box';
+        el.style.wordBreak    = 'break-word';
+        el.style.overflowWrap = 'anywhere';
+        el.style.whiteSpace   = 'pre-wrap';
+        el.style.verticalAlign = 'top';
+        if (c.img && c.img.trim()){
+          el.style.color = c.color;
+          el.style.background = 'transparent';
+          el.style.backgroundColor = 'transparent';
+        } else {
+          if (which === 'role'){
+            el.style.background = '#ffffff';
+            el.style.color = c.color || '#1c1c1e';
+            el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
+          } else {
+            el.style.background = '#1c1c1e';
+            el.style.color = '#ffffff';
+            el.style.boxShadow = 'none';
+          }
+        }
+      });
+      document.querySelectorAll(sel + ' .cv-bubble-text, ' + sel + ' > span').forEach(function(sp){
+        sp.style.display   = 'inline-block';
+        sp.style.position  = 'relative';
+        sp.style.left      = c.textX + 'px';
+        sp.style.top       = c.textY + 'px';
+      });
+    });
+  }
+
+  function render(){
+    const css = buildAll();
+    codeOut.textContent = css;
+
+    let scoped = '';
+    if (state.format === 'mori'){
+      scoped = css.replace(/(\.cv-bubble-(?:role|user))/g, '#preview $1');
+    } else if (state.format === 'nuoji') {
+      scoped = css
+        .replace(/\.bubble-them-custom/g, '#preview .cv-bubble-role')
+        .replace(/\.bubble-me-custom/g, '#preview .cv-bubble-user');
+    } else if (state.format === 'link') {
+      scoped = css
+        .replace(/\.chat-room \.message-row\.user \.bubble/g, '#preview .cv-bubble-user')
+        .replace(/\.chat-room \.bubble/g, '#preview .cv-bubble-role');
+    }
+    liveStyle.textContent = scoped;
+
+    const c = state[state.tab];
+    if (c.img && c.img.trim()){
+      if (sliceImg.getAttribute('src') !== c.img) sliceImg.src = c.img;
+      slicer.classList.add('has-img');
+      slicer.classList.remove('no-img');
+    } else {
+      sliceImg.removeAttribute('src');
+      slicer.classList.remove('has-img');
+      slicer.classList.add('no-img');
+    }
+    positionLines();
+
+    previewMode.textContent = state.tab === 'role' ? '对面气泡' : '我的气泡';
+    slicerLabel.textContent = (state.tab === 'role' ? '对面气泡' : '我的气泡') + ' · 九宫格编辑';
+
+    applyInlineStyles();
+    if (preview.classList.contains('is-open')) positionPreview();
+  }
+
+  function positionLines(){
+    const c = state[state.tab];
+    const el = { l: null, r: null, t: null, b: null };
+    $$('.gline', slicer).forEach(function(g){ el[g.dataset.side] = g; });
+    if (el.l) el.l.style.left = c.slice.l + '%';
+    if (el.r) el.r.style.left = (100 - c.slice.r) + '%';
+    if (el.t) el.t.style.top  = c.slice.t + '%';
+    if (el.b) el.b.style.top  = (100 - c.slice.b) + '%';
+  }
+
+  function fmtVal(key, v){
+    if (key === 'slice.t' || key === 'slice.r' || key === 'slice.b' || key === 'slice.l') return v + '%';
+    if (key === 'fontSize' || key === 'maxWidth'
+     || key === 'padX' || key === 'padY' || key === 'textX' || key === 'textY') return v + 'px';
+    if (key === 'zoomScale') return Number(v).toFixed(2);
+    if (key === 'lineHeight') return v;
+    return v;
+  }
+
+  function syncUI(){
+    $$('.tab').forEach(function(t){
+      t.classList.toggle('is-active', t.dataset.tab === state.tab);
+    });
+    const c = state[state.tab];
+    $$('[data-key]', panelBody).forEach(function(wrap){
+      const key = wrap.dataset.key;
+      const input = wrap.querySelector('input:not([type=file]), select');
+      if (!input) return;
+      const v = get(c, key);
+      if (input.type === 'checkbox') input.checked = !!v;
+      else input.value = v;
+      const valEl = wrap.querySelector('.val');
+      if (valEl && input.type !== 'color' && input.type !== 'checkbox' && input.tagName !== 'SELECT'){
+        valEl.textContent = fmtVal(key, v);
+      }
+    });
+  }
+
+  panelBody.addEventListener('input', function(e){
+    const wrap = e.target.closest('[data-key]');
+    if (!wrap) return;
+    const key = wrap.dataset.key;
+    if (key === 'img') return;
+    let v;
+    if (e.target.type === 'range')          v = parseFloat(e.target.value);
+    else if (e.target.type === 'checkbox')  v = e.target.checked;
+    else if (e.target.tagName === 'SELECT') v = e.target.value;
+    else if (e.target.type === 'color')     v = e.target.value;
+    else if (e.target.type === 'number')    v = parseFloat(e.target.value) || 1;
+    else                                    v = e.target.value;
+    if (key.indexOf('slice.') === 0){
+      const c = state[state.tab];
+      const other = { 'slice.l':'r', 'slice.r':'l', 'slice.t':'b', 'slice.b':'t' }[key];
+      const max = 100 - c.slice[other] - 2;
+      v = Math.max(0, Math.min(v, max));
+      e.target.value = v;
+    }
+    set(state[state.tab], key, v);
+    const valEl = wrap.querySelector('.val');
+    if (valEl) valEl.textContent = fmtVal(key, v);
+    render();
+  });
+
+  const imgInput = panelBody.querySelector('[data-key="img"] .txt');
+  let imgTimer = null;
+  imgInput.addEventListener('input', function(){
+    clearTimeout(imgTimer);
+    const v = imgInput.value.trim();
+    imgTimer = setTimeout(function(){
+      state[state.tab].img = v;
+      render();
+    }, 240);
+  });
+
+  const fileInput = panelBody.querySelector('.upload input[type=file]');
+  fileInput.addEventListener('change', function(){
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = function(){
+      const dataUrl = String(reader.result);
+      state[state.tab].img = dataUrl;
+      imgInput.value = '';
+      imgInput.placeholder = '已载入本地图片（仅预览）';
+      const tmp = new Image();
+      tmp.onload = function(){
+        state.imgNatural.w = tmp.naturalWidth;
+        state.imgNatural.h = tmp.naturalHeight;
+        render();
+      };
+      tmp.src = dataUrl;
+      render();
+    };
+    reader.readAsDataURL(f);
+  });
+
+  sliceImg.addEventListener('load', function(){
+    state.imgNatural.w = sliceImg.naturalWidth;
+    state.imgNatural.h = sliceImg.naturalHeight;
+    render();
+  });
+
+  $$('.tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      state.tab = btn.dataset.tab;
+      syncUI();
+      render();
+    });
+  });
+
+  $$('.format-tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      $$('.format-tab').forEach(function(b){ b.classList.remove('is-active'); });
+      btn.classList.add('is-active');
+      state.format = btn.dataset.format;
+      render();
+    });
+  });
+
+  resetBtn.addEventListener('click', function(){
+    state[state.tab] = JSON.parse(JSON.stringify(DEFAULTS));
+    imgInput.value = '';
+    imgInput.placeholder = '粘贴图片链接 https://…';
+    fileInput.value = '';
+    syncUI();
+    render();
+    resetBtn.textContent = '已重置';
+    setTimeout(function(){
+      resetBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>重置';
+    }, 900);
+  });
+
+  let dragSide = null;
+  let slicerRect = null;
+
+  slicer.addEventListener('pointerdown', function(e){
+    const line = e.target.closest('.gline');
+    if (!line) return;
+    dragSide = line.dataset.side;
+    line.classList.add('dragging');
+    slicerRect = slicer.getBoundingClientRect();
+    line.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  slicer.addEventListener('pointermove', function(e){
+    if (!dragSide || !slicerRect) return;
+    const c = state[state.tab];
+    const w = slicerRect.width;
+    const h = slicerRect.height;
+    let v;
+    if (dragSide === 'l' || dragSide === 'r'){
+      const pct = Math.max(0, Math.min(100, ((e.clientX - slicerRect.left) / w) * 100));
+      if (dragSide === 'l'){ v = Math.max(0, Math.min(pct, 100 - c.slice.r - 2)); c.slice.l = v; }
+      else { v = Math.max(0, Math.min(100 - pct, 100 - c.slice.l - 2)); c.slice.r = v; }
+    } else {
+      const pct = Math.max(0, Math.min(100, ((e.clientY - slicerRect.top) / h) * 100));
+      if (dragSide === 't'){ v = Math.max(0, Math.min(pct, 100 - c.slice.b - 2)); c.slice.t = v; }
+      else { v = Math.max(0, Math.min(100 - pct, 100 - c.slice.t - 2)); c.slice.b = v; }
+    }
+    syncUI();
+    positionLines();
+    render();
+    const line = slicer.querySelector('.gline[data-side="' + dragSide + '"]');
+    if (line) line.classList.add('dragging');
+  });
+
+  function endDrag(e){
+    if (!dragSide) return;
+    const line = slicer.querySelector('.gline[data-side="' + dragSide + '"]');
+    if (line) line.classList.remove('dragging');
+    dragSide = null;
+    slicerRect = null;
+  }
+  slicer.addEventListener('pointerup', endDrag);
+  slicer.addEventListener('pointercancel', endDrag);
+  slicer.addEventListener('lostpointercapture', endDrag);
+
+  let fabPos = { x: 0, y: 0 };
+  let fabInit = false;
+  let dragInfo = null;
+  let moved = false;
+
+  function fabSize(){ return fab.offsetWidth || 58; }
+  function clampFab(x, y){
+    const ws = workspace.getBoundingClientRect();
+    const s = fabSize();
+    const pad = 12;
+    return { x: Math.max(pad, Math.min(x, ws.width - s - pad)), y: Math.max(pad, Math.min(y, ws.height - s - pad)) };
+  }
+  function placeFab(x, y){
+    const p = clampFab(x, y);
+    fabPos.x = p.x; fabPos.y = p.y;
+    fab.style.left = p.x + 'px';
+    fab.style.top  = p.y + 'px';
+  }
+  function initFab(){
+    const ws = workspace.getBoundingClientRect();
+    const s = fabSize();
+    placeFab(ws.width - s - 28, ws.height - s - 28);
+    fabInit = true;
+  }
+
+  fab.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    const ws = workspace.getBoundingClientRect();
+    dragInfo = { startX: e.clientX, startY: e.clientY, originX: fabPos.x, originY: fabPos.y, ws: ws };
+    moved = false;
+    fab.classList.add('is-dragging');
+    fab.setPointerCapture(e.pointerId);
+  });
+
+  fab.addEventListener('pointermove', function(e){
+    if (!dragInfo) return;
+    const dx = e.clientX - dragInfo.startX;
+    const dy = e.clientY - dragInfo.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+    placeFab(dragInfo.originX + dx, dragInfo.originY + dy);
+    if (preview.classList.contains('is-open')) positionPreview();
+  });
+
+  function fabRelease(e){
+    if (!dragInfo) return;
+    fab.classList.remove('is-dragging');
+    dragInfo = null;
+    if (!moved) togglePreview();
+  }
+  fab.addEventListener('pointerup', fabRelease);
+  fab.addEventListener('pointercancel', fabRelease);
+  fab.addEventListener('lostpointercapture', function(){
+    fab.classList.remove('is-dragging');
+    dragInfo = null;
+  });
+
+  function togglePreview(){
+    const open = !preview.classList.contains('is-open');
+    preview.classList.toggle('is-open', open);
+    fab.classList.toggle('is-open', open);
+    if (open){ positionPreview(); requestAnimationFrame(positionPreview); }
+  }
+
+  function positionPreview(){
+    const ws = workspace.getBoundingClientRect();
+    const pw = preview.offsetWidth  || 320;
+    const ph = preview.offsetHeight || 400;
+    const s  = fabSize();
+    const gap = 14;
+    const pad = 12;
+    let left = fabPos.x - pw - gap;
+    if (left < pad) left = fabPos.x + s + gap;
+    if (left + pw > ws.width - pad) left = ws.width - pw - pad;
+    let top = fabPos.y + s / 2 - ph / 2;
+    top = Math.max(pad, Math.min(top, ws.height - ph - pad));
+    preview.style.left = left + 'px';
+    preview.style.top  = top + 'px';
+  }
+
+  const copyBtn = $('#copyBtn');
+  copyBtn.addEventListener('click', function(){
+    const text = codeOut.textContent;
+    const done = function(){
+      copyBtn.textContent = '已复制';
+      setTimeout(function(){ copyBtn.textContent = '复制'; }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){ fallbackCopy(text); done(); });
+    } else { fallbackCopy(text); done(); }
+  });
+  function fallbackCopy(text){
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  let resizeTimer = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function(){
+      if (!fabInit) return;
+      placeFab(fabPos.x, fabPos.y);
+      if (preview.classList.contains('is-open')) positionPreview();
+    }, 120);
+  });
+
+  syncUI();
+  render();
+  initFab();
+})();
+</script>
+</body>
+</html>
