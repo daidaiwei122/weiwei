@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>唯唯气泡生成器</title>
 <style>
   :root{
@@ -17,6 +17,8 @@
     font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",Arial,sans-serif;
     background:var(--bg);color:var(--ink);font-size:13px;
     -webkit-font-smoothing:antialiased;overflow:hidden;
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
   }
   .app{display:grid;grid-template-columns:376px 1fr;height:100vh;overflow:hidden}
 
@@ -40,7 +42,7 @@
   .activation-card h2{margin:0 0 14px;font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
   .act-notice{font-size:13px;line-height:1.75;color:var(--ink-2);background:#fafafc;border:1px solid var(--line-2);border-radius:12px;padding:14px 16px;margin-bottom:22px;text-align:left}
   .act-notice b{color:var(--ink);font-weight:600}
-  .act-input{width:100%;height:44px;padding:0 16px;border:1.5px solid var(--line);border-radius:12px;background:#fafafa;font-family:inherit;font-size:14px;color:var(--ink);outline:none;transition:.2s;text-align:center}
+  .act-input{width:100%;height:44px;padding:0 16px;border:1.5px solid var(--line);border-radius:12px;background:#fafafa;font-family:inherit;font-size:16px;color:var(--ink);outline:none;transition:.2s;text-align:center}
   .act-input::placeholder{color:var(--ink-3);font-size:13px}
   .act-input:focus{background:#fff;border-color:#d5d5da;box-shadow:0 0 0 4px rgba(0,0,0,.03)}
   .act-input.is-error{border-color:#ffb3ae;animation:shake .35s}
@@ -51,6 +53,42 @@
   .act-btn{width:100%;height:44px;margin-top:18px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:.18s;letter-spacing:.02em}
   .act-btn:hover{background:#000;box-shadow:0 8px 20px rgba(0,0,0,.18)}
   .act-btn:active{transform:scale(.98)}
+
+  /* ===== 公告弹窗 ===== */
+  .notice-mask{
+    position:fixed; inset:0; z-index:10000;
+    background:rgba(20,20,25,.42);
+    backdrop-filter:blur(14px) saturate(140%);
+    -webkit-backdrop-filter:blur(14px) saturate(140%);
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .notice-mask.is-open{display:flex}
+  .notice-card{
+    background:#fff; border-radius:22px; padding:26px 24px 22px;
+    width:100%; max-width:400px;
+    box-shadow:0 30px 80px rgba(20,20,30,.24), 0 0 0 1px rgba(0,0,0,.04);
+    animation:cardIn .38s cubic-bezier(.2,.8,.3,1);
+  }
+  .notice-title{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:14px;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
+  .notice-title::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--red);flex:none}
+  .notice-body{
+    font-size:13px;line-height:1.9;color:var(--ink-2);
+    background:#fafafc;border:1px solid var(--line-2);border-radius:12px;
+    padding:14px 16px;margin-bottom:18px;max-height:46vh;overflow-y:auto;
+  }
+  .notice-body b{color:var(--ink);font-weight:600}
+  .notice-body .notice-tag{
+    display:inline-block;font-size:11px;font-weight:600;color:#fff;background:var(--ink);
+    border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:1px;letter-spacing:.02em;
+  }
+  .notice-btn{
+    width:100%;height:44px;border:none;border-radius:12px;
+    background:var(--accent);color:#fff;font-family:inherit;font-size:14px;font-weight:500;
+    cursor:pointer;transition:.18s;letter-spacing:.02em;
+  }
+  .notice-btn:disabled{background:#e8e8ec;color:#a5a5aa;cursor:not-allowed}
+  .notice-btn:not(:disabled):hover{background:#000;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+  .notice-btn:not(:disabled):active{transform:scale(.98)}
 
   .panel{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;z-index:10}
   .panel-head{padding:20px 18px 14px;flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
@@ -66,7 +104,7 @@
   .tab:hover{background:#eeeef1}
   .tab.is-active{background:var(--ink);color:#fff}
 
-  .panel-body{flex:1;overflow-y:auto;padding:0 14px 24px;display:flex;flex-direction:column;gap:10px}
+  .panel-body{flex:1;overflow-y:auto;padding:0 14px 24px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
   .panel-body::-webkit-scrollbar{width:9px}
   .panel-body::-webkit-scrollbar-thumb{background:#e3e3e7;border-radius:6px;border:3px solid #fff}
   .panel-body::-webkit-scrollbar-track{background:transparent}
@@ -81,18 +119,18 @@
   .ctrl-head b{font-weight:500;color:var(--ink-3);font-variant-numeric:tabular-nums;font-size:11.5px}
   .ctrl.inline{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink-2)}
 
-  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;background:transparent;cursor:pointer;display:block;margin:0}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;background:transparent;cursor:pointer;display:block;margin:0;touch-action:manipulation}
   input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:#e6e6ea}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-5.5px;border-radius:50%;background:#fff;border:1px solid #dcdce1;box-shadow:0 1px 3px rgba(0,0,0,.14);transition:transform .15s}
   input[type=range]:active::-webkit-slider-thumb{transform:scale(1.15)}
   input[type=range]::-moz-range-track{height:3px;border-radius:2px;background:#e6e6ea}
   input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:#fff;border:1px solid #dcdce1;box-shadow:0 1px 3px rgba(0,0,0,.14)}
 
-  .txt{width:100%;height:34px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:#fafafa;font-family:inherit;font-size:12px;color:var(--ink);outline:none;transition:.18s}
-  .txt::placeholder{color:var(--ink-3)}
+  .txt{width:100%;height:34px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:#fafafa;font-family:inherit;font-size:16px;color:var(--ink);outline:none;transition:.18s;touch-action:manipulation}
+  .txt::placeholder{color:var(--ink-3);font-size:12px}
   .txt:focus{background:#fff;border-color:#d5d5da;box-shadow:0 0 0 3px rgba(0,0,0,.03)}
 
-  .sel{height:30px;padding:0 26px 0 10px;border:1px solid var(--line);border-radius:8px;background:#fafafa url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a5a5aa' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 9px center;-webkit-appearance:none;appearance:none;font-family:inherit;font-size:12px;color:var(--ink);outline:none;cursor:pointer}
+  .sel{height:30px;padding:0 26px 0 10px;border:1px solid var(--line);border-radius:8px;background:#fafafa url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a5a5aa' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 9px center;-webkit-appearance:none;appearance:none;font-family:inherit;font-size:16px;color:var(--ink);outline:none;cursor:pointer;touch-action:manipulation}
 
   .switch{position:relative;display:inline-block;width:38px;height:22px;flex:none}
   .switch input{opacity:0;width:0;height:0;position:absolute}
@@ -112,12 +150,13 @@
   .mini-btn{height:24px;padding:0 11px;border:1px solid var(--line);border-radius:7px;background:#fafafa;font-family:inherit;font-size:11px;color:var(--ink-2);cursor:pointer;transition:.18s}
   .mini-btn:hover{background:#f0f0f3;color:var(--ink)}
 
-  .format-tabs{display:flex;gap:4px;margin-bottom:10px}
-  .format-tab{flex:1;height:30px;border:1px solid var(--line);border-radius:8px;background:#fafafa;color:var(--ink-2);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:.18s}
+  .format-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:10px}
+  .format-tab{height:30px;border:1px solid var(--line);border-radius:8px;background:#fafafa;color:var(--ink-2);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:.18s}
   .format-tab:hover{background:#f0f0f3;color:var(--ink)}
   .format-tab.is-active{background:var(--ink);color:#fff;border-color:var(--ink)}
 
-  .code{margin:0;padding:12px;background:#fafafa;border:1px solid var(--line-2);border-radius:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.65;color:#3a3a3c;white-space:pre-wrap;word-break:break-all;max-height:280px;overflow:auto}
+  .code{margin:0;padding:12px;background:#fafafa;border:1px solid var(--line-2);border-radius:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.65;color:#3a3a3c;white-space:pre-wrap;word-break:break-all;max-height:280px;min-height:120px;overflow:auto;outline:none;cursor:text;transition:.18s;touch-action:manipulation}
+  .code:focus{background:#fff;border-color:#d5d5da;box-shadow:0 0 0 3px rgba(0,0,0,.03)}
   .code::-webkit-scrollbar{width:7px;height:7px}
   .code::-webkit-scrollbar-thumb{background:#e0e0e5;border-radius:4px}
 
@@ -196,6 +235,20 @@
     <input class="act-input" type="text" id="actInput" placeholder="请输入激活码" autocomplete="off" spellcheck="false" />
     <div class="act-error" id="actError">激活码错误</div>
     <button class="act-btn" id="actBtn">确认激活</button>
+  </div>
+</div>
+
+<!-- ===== 激活后公告 ===== -->
+<div class="notice-mask" id="noticeMask">
+  <div class="notice-card">
+    <div class="notice-title">更新公告</div>
+    <div class="notice-body">
+      <p style="margin:0 0 10px"><span class="notice-tag">更新</span>本次更新了<b>曲曲机</b>的适配。</p>
+      <p style="margin:0 0 10px"><span class="notice-tag">注意</span>通过此气泡生成器发布，<b>需要标注生成器</b>，<b>禁止二传气泡生成器行为</b>等。</p>
+      <p style="margin:0 0 10px"><span class="notice-tag">提示</span>文字偏移有点 bug，大家复制好代码去让 <b>AI 移动文字</b>就好 QAQ</p>
+      <p style="margin:0">感谢大家的支持与包容，祝使用愉快 ~</p>
+    </div>
+    <button class="notice-btn" id="noticeBtn" disabled>我知道了</button>
   </div>
 </div>
 
@@ -330,15 +383,16 @@
 
       <section class="card">
         <div class="card-head">
-          生成代码
+          <span>生成代码 <em>可直接编辑</em></span>
           <button class="mini-btn" id="copyBtn">复制</button>
         </div>
         <div class="format-tabs">
           <button class="format-tab is-active" data-format="mori">Mori 格式</button>
           <button class="format-tab" data-format="nuoji">糯叽机格式</button>
           <button class="format-tab" data-format="link">LINK 格式</button>
+          <button class="format-tab" data-format="ququ">曲曲机格式</button>
         </div>
-        <pre class="code" id="codeOut"></pre>
+        <pre class="code" id="codeOut" contenteditable="true" spellcheck="false"></pre>
       </section>
 
     </div>
@@ -410,10 +464,35 @@
   "use strict";
 
   /* ══════════════════════════════════════════════════════
+     移动端：只阻止手势缩放，不改动任何元素的字号
+     （之前的临时提到 16px 逻辑已移除，保持原字号）
+     ══════════════════════════════════════════════════════ */
+  (function fixMobileZoom(){
+    var isTouch = ('ontouchstart' in window)
+               || (navigator.maxTouchPoints > 0)
+               || window.matchMedia('(pointer:coarse)').matches;
+    if (!isTouch) return;
+
+    /* 阻止 iOS 双指缩放 */
+    document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, { passive:false });
+    document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, { passive:false });
+    document.addEventListener('gestureend', function(e){ e.preventDefault(); }, { passive:false });
+
+    /* 阻止双击缩放（300ms 内连点两次直接拦掉） */
+    var lastTouch = 0;
+    document.addEventListener('touchend', function(e){
+      var now = Date.now();
+      if (now - lastTouch <= 300) e.preventDefault();
+      lastTouch = now;
+    }, { passive:false });
+  })();
+
+  /* ══════════════════════════════════════════════════════
      固定密码激活（weiwei520）
      ══════════════════════════════════════════════════════ */
   var ACT_KEY = 'weiwei_activated_final';
   var ACT_CODE = 'weiwei520';   /* ← 激活密码，可改成你想要的内容 */
+  var NOTICE_KEY = 'weiwei_notice_v1';  /* 公告是否已读 */
 
   function isActivated(){
     try { return localStorage.getItem(ACT_KEY) === '1'; } catch(e){ return false; }
@@ -421,15 +500,55 @@
   function setActivated(){
     try { localStorage.setItem(ACT_KEY, '1'); } catch(e){}
   }
+  function isNoticeSeen(){
+    try { return localStorage.getItem(NOTICE_KEY) === '1'; } catch(e){ return false; }
+  }
+  function setNoticeSeen(){
+    try { localStorage.setItem(NOTICE_KEY, '1'); } catch(e){}
+  }
 
   var actMask  = document.getElementById('actMask');
   var actInput = document.getElementById('actInput');
   var actError = document.getElementById('actError');
   var actBtn   = document.getElementById('actBtn');
 
+  var noticeMask = document.getElementById('noticeMask');
+  var noticeBtn  = document.getElementById('noticeBtn');
+  var noticeTimer = null;
+
+  /* ---------- 公告弹窗（5 秒后方可点击） ---------- */
+  function showNotice(){
+    if (noticeMask.classList.contains('is-open')) return;
+    var left = 5;
+    noticeBtn.disabled = true;
+    noticeBtn.textContent = '我知道了（' + left + 's）';
+    noticeMask.classList.add('is-open');
+    clearInterval(noticeTimer);
+    noticeTimer = setInterval(function(){
+      left--;
+      if (left <= 0){
+        clearInterval(noticeTimer);
+        noticeBtn.disabled = false;
+        noticeBtn.textContent = '我知道了';
+      } else {
+        noticeBtn.textContent = '我知道了（' + left + 's）';
+      }
+    }, 1000);
+  }
+
+  noticeBtn.addEventListener('click', function(){
+    if (noticeBtn.disabled) return;
+    clearInterval(noticeTimer);
+    noticeMask.classList.remove('is-open');
+    setNoticeSeen();
+  });
+
+  /* ---------- 激活流程 ---------- */
   if (!isActivated()){
     actMask.classList.add('is-open');
     setTimeout(function(){ actInput.focus(); }, 280);
+  } else if (!isNoticeSeen()){
+    setTimeout(showNotice, 400);
   }
 
   function showActError(msg){
@@ -447,6 +566,7 @@
       actMask.classList.remove('is-open');
       actError.classList.remove('is-show');
       actInput.classList.remove('is-error');
+      if (!isNoticeSeen()) showNotice();
     } else {
       showActError('激活码错误');
     }
@@ -879,6 +999,125 @@
     ].join('\n');
   }
 
+  /* ====== 曲曲机格式 ====== */
+  function bubbleBlockQuqu(which){
+    const c = state[which];
+    const isRole = which === 'role';
+    const cls = isRole ? '.cv-row.is-ta .cv-bubble' : '.cv-row.is-me .cv-bubble';
+    const title = isRole ? '对面气泡（ta）' : '我的气泡（me）';
+
+    const bw = calcBorderPx(c);
+    const bwStr = bw.t + 'px ' + bw.r + 'px ' + bw.b + 'px ' + bw.l + 'px';
+
+    const textOffsetBlock = [
+      '',
+      '/* 文字层：独立偏移，气泡完全不动 */',
+      cls + ' > span,',
+      cls + ' > .cv-bubble-text {',
+      '  display: inline-block !important;',
+      '  position: relative !important;',
+      '  left: ' + c.textX + 'px !important;',
+      '  top: ' + c.textY + 'px !important;',
+      '  will-change: left, top;',
+      '}',
+      ''
+    ].join('\n');
+
+    const baseProps = [
+      'box-sizing: border-box !important;',
+      'width: fit-content !important;',
+      'max-width: ' + c.maxWidth + 'px !important;',
+      'word-break: break-word !important;',
+      'overflow-wrap: anywhere !important;',
+      'white-space: pre-wrap !important;',
+      'font-size: ' + c.fontSize + 'px !important;',
+      'line-height: ' + c.lineHeight + ' !important;',
+      'color: ' + c.color + ' !important;',
+      'padding: ' + c.padY + 'px ' + c.padX + 'px !important;'
+    ];
+
+    if (!c.img || !c.img.trim()){
+      return [
+        '/* ── ' + title + ' ── */',
+        cls + ' {',
+        '  ' + baseProps.join('\n  '),
+        '}',
+        textOffsetBlock
+      ].join('\n');
+    }
+
+    const slice = c.slice.t + '% ' + c.slice.r + '% ' + c.slice.b + '% ' + c.slice.l + '%';
+    const fillStr = c.fill ? ' fill' : '';
+    const bi = 'border-image: url("' + c.img + '") ' + slice + fillStr + ' / ' + bwStr + ' ' + c.repeat + ' !important;';
+
+    const imageProps = [
+      'box-sizing: border-box !important;',
+      'border-style: solid !important;',
+      'border-width: ' + bwStr + ' !important;',
+      bi,
+      'background: transparent !important;',
+      'background-color: transparent !important;',
+      'border-radius: 0 !important;',
+      'box-shadow: none !important;',
+      'width: fit-content !important;',
+      'max-width: ' + c.maxWidth + 'px !important;',
+      'word-break: break-word !important;',
+      'overflow-wrap: anywhere !important;',
+      'white-space: pre-wrap !important;',
+      'font-size: ' + c.fontSize + 'px !important;',
+      'line-height: ' + c.lineHeight + ' !important;',
+      'color: ' + c.color + ' !important;',
+      'padding: ' + c.padY + 'px ' + c.padX + 'px !important;'
+    ];
+
+    if (c.mirror){
+      const inset = '-' + bw.t + 'px -' + bw.r + 'px -' + bw.b + 'px -' + bw.l + 'px';
+      return [
+        '/* ── ' + title + ' ── */',
+        cls + ' {',
+        '  position: relative !important;',
+        '  z-index: 0 !important;',
+        '  border-style: solid !important;',
+        '  border-width: ' + bwStr + ' !important;',
+        '  border-color: transparent !important;',
+        '  background: transparent !important;',
+        '  background-color: transparent !important;',
+        '  border-radius: 0 !important;',
+        '  box-shadow: none !important;',
+        '  width: fit-content !important;',
+        '  max-width: ' + c.maxWidth + 'px !important;',
+        '  word-break: break-word !important;',
+        '  font-size: ' + c.fontSize + 'px !important;',
+        '  line-height: ' + c.lineHeight + ' !important;',
+        '  color: ' + c.color + ' !important;',
+        '  padding: ' + c.padY + 'px ' + c.padX + 'px !important;',
+        '}',
+        '',
+        cls + '::before {',
+        '  content: "" !important;',
+        '  position: absolute !important;',
+        '  inset: ' + inset + ' !important;',
+        '  box-sizing: border-box !important;',
+        '  border-style: solid !important;',
+        '  border-width: ' + bwStr + ' !important;',
+        '  ' + bi,
+        '  transform: scaleX(-1) !important;',
+        '  pointer-events: none !important;',
+        '  z-index: -1 !important;',
+        '}',
+        textOffsetBlock
+      ].join('\n');
+    }
+
+    return [
+      '/* ── ' + title + ' ── */',
+      cls + ' {',
+      '  ' + imageProps.join('\n  '),
+      '}',
+      textOffsetBlock
+    ].join('\n');
+  }
+
   function buildCardOverrideNuoji(){
     var cardSelectors = [
       '.msg-transfer-card', '.msg-redpacket-card', '.msg-loc-card',
@@ -952,6 +1191,43 @@
     return lines.join('\n');
   }
 
+  /* 曲曲机：卡片气泡透明化 */
+  function buildCardOverrideQuqu(){
+    var cardSelectors = [
+      '.cv-pay', '.cv-voice', '.cv-photo', '.cv-loc', '.cv-link',
+      '.cv-sticker', '.cv-mini', '.cv-call', '.cv-tip', '.cv-rc'
+    ];
+    var lines = [];
+    lines.push('/* ===== 卡片消息：不显示图片气泡，直接显示卡片本身 ===== */');
+    lines.push('');
+    var pairs = [];
+    ['.cv-row.is-ta', '.cv-row.is-me'].forEach(function(row){
+      cardSelectors.forEach(function(sel){
+        pairs.push(row + ' ' + sel);
+        pairs.push(row + ' .cv-bubble:has(' + sel + ')');
+      });
+    });
+    lines.push(pairs.join(',\n') + ' {');
+    lines.push('  background: transparent !important;');
+    lines.push('  background-color: transparent !important;');
+    lines.push('  border: none !important;');
+    lines.push('  border-width: 0 !important;');
+    lines.push('  border-image: none !important;');
+    lines.push('  border-radius: 0 !important;');
+    lines.push('  box-shadow: none !important;');
+    lines.push('  padding: 0 !important;');
+    lines.push('  max-width: none !important;');
+    lines.push('  width: auto !important;');
+    lines.push('  color: inherit !important;');
+    lines.push('  font-size: inherit !important;');
+    lines.push('  line-height: inherit !important;');
+    lines.push('  white-space: normal !important;');
+    lines.push('}');
+    lines.push('');
+    lines.push(cardSelectors.map(function(sel){ return sel + ' { margin: 0 !important; }'; }).join('\n'));
+    return lines.join('\n');
+  }
+
   function buildAll(){
     if (state.format === 'nuoji'){
       return '/* ========== 唯唯气泡生成器 · 糯叽机格式 ========== */\n'
@@ -964,6 +1240,12 @@
            + '/* 粘贴位置：LINK → 聊天界面美化 → 自定义 CSS */\n\n'
            + bubbleBlockLink('role') + '\n' + bubbleBlockLink('user') + '\n\n'
            + buildCardOverrideLink();
+    }
+    if (state.format === 'ququ'){
+      return '/* ========== 唯唯气泡生成器 · 曲曲机格式 ========== */\n'
+           + '/* 粘贴位置：曲曲机 → 会话页 → 自定义 CSS（整段自动关进会话页） */\n\n'
+           + bubbleBlockQuqu('role') + '\n' + bubbleBlockQuqu('user') + '\n\n'
+           + buildCardOverrideQuqu();
     }
     return '/* ========== 唯唯气泡生成器 · Mori 格式 ========== */\n'
          + '/* 粘贴位置：Mori → 聊天 → 右上角更多 → 聊天显示 → 气泡 CSS */\n\n'
@@ -1030,6 +1312,10 @@
       scoped = css
         .replace(/\.chat-room \.message-row\.user \.bubble/g, '#preview .cv-bubble-user')
         .replace(/\.chat-room \.bubble/g, '#preview .cv-bubble-role');
+    } else if (state.format === 'ququ') {
+      scoped = css
+        .replace(/\.cv-row\.is-me \.cv-bubble/g, '#preview .cv-bubble-user')
+        .replace(/\.cv-row\.is-ta \.cv-bubble/g, '#preview .cv-bubble-role');
     }
     liveStyle.textContent = scoped;
 
@@ -1327,6 +1613,18 @@
     try { document.execCommand('copy'); } catch(e){}
     document.body.removeChild(ta);
   }
+
+  /* 代码区：粘贴时只保留纯文本，避免带入外部样式 */
+  codeOut.addEventListener('paste', function(e){
+    e.preventDefault();
+    var text = '';
+    if (e.clipboardData || window.clipboardData){
+      text = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
+    }
+    if (document.execCommand){
+      document.execCommand('insertText', false, text);
+    }
+  });
 
   let resizeTimer = null;
   window.addEventListener('resize', function(){
